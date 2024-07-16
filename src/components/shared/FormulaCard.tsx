@@ -24,14 +24,17 @@ interface FormulaCardProps {
   index: number;
 }
 
-const fetchSuggestions = async (query: string): Promise<string[]> => {
-  const response = await fetch(`https://652f91320b8d8ddac0b2b62b.mockapi.io/autocomplete`);
-  console.log(">>>>>>>>>> response of the", response);
-  if (!response.ok) {
-    throw new Error('Network response was not ok');
-  }
-  return response.json();
-};
+const dummySuggestions = [
+  "Initial Customer Count",
+  "Monthly Churn Rate",
+  "Monthly Contract Value",
+  "Monthly New Customers",
+  "Revenue",
+  "Expenses",
+  "Net Income",
+  "Customer Satisfaction",
+  "Employee Count"
+];
 
 const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
   const { removeFormula, addTagToFormula, addTimeSegment, removeTimeSegment, removeTagFromFormula, addItemToSegment, removeItemFromSegment } = useStore();
@@ -44,7 +47,6 @@ const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
   });
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [segmentInputs, setSegmentInputs] = useState<string[]>([]);
-  console.log(">>>>>>>>>> response of the autosuggestion", suggestions);
 
   const handleRemoveFormula = () => {
     removeFormula(index);
@@ -96,18 +98,32 @@ const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
     setSegmentInputs(updatedInputs);
   };
 
-  const handleSegmentInputKeyDown = (segmentIndex: number, value: string) => {
-    addItemToSegment(index, segmentIndex, value);
-    setSegmentInputs((prev) => {
-      const newInputs = [...prev];
-      newInputs[segmentIndex] = '';
-      return newInputs;
-    });
+  const handleSegmentInputKeyDown = (e: KeyboardEvent<HTMLInputElement>, segmentIndex: number) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const value = segmentInputs[segmentIndex].trim();
+      if (value && suggestions.includes(value)) {
+        addItemToSegment(index, segmentIndex, value);
+        setSegmentInputs((prev) => {
+          const newInputs = [...prev];
+          newInputs[segmentIndex] = '';
+          return newInputs;
+        });
+      }
+    }
   };
 
-  const handleSuggestionsFetchRequested = async ({ value }: { value: string }) => {
-    const suggestions = await fetchSuggestions(value);
-    setSuggestions(suggestions);
+  const handleSuggestionsFetchRequested = ({ value }: { value: string }) => {
+    const inputValue = value.trim().toLowerCase();
+    const inputLength = inputValue.length;
+
+    const filteredSuggestions = inputLength === 0
+      ? []
+      : dummySuggestions.filter(suggestion =>
+          suggestion.toLowerCase().includes(inputValue)
+        );
+
+    setSuggestions(filteredSuggestions);
   };
 
   const handleSuggestionsClearRequested = () => {
@@ -117,6 +133,18 @@ const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
   const getSuggestionValue = (suggestion: string) => suggestion;
 
   const renderSuggestion = (suggestion: string) => <span>{suggestion}</span>;
+
+  const handleSuggestionSelected = (event: React.FormEvent, { suggestion, suggestionValue }: { suggestion: string, suggestionValue: string }) => {
+    const segmentIndex = segmentInputs.findIndex(input => input === suggestionValue);
+    if (segmentIndex !== -1) {
+      addItemToSegment(index, segmentIndex, suggestionValue);
+      setSegmentInputs((prev) => {
+        const newInputs = [...prev];
+        newInputs[segmentIndex] = '';
+        return newInputs;
+      });
+    }
+  };
 
   return (
     <Paper sx={{ p: 2, mb: 2 }}>
@@ -131,7 +159,6 @@ const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center' }}>
           <Typography sx={{ mr: 2 }}>Jul 2024</Typography>
-
           <IconButton>
             <InfoIcon />
           </IconButton>
@@ -169,15 +196,12 @@ const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
                   onSuggestionsClearRequested={handleSuggestionsClearRequested}
                   getSuggestionValue={getSuggestionValue}
                   renderSuggestion={renderSuggestion}
+                  onSuggestionSelected={handleSuggestionSelected}
                   inputProps={{
                     placeholder: "Add item",
                     value: segmentInputs[segmentIndex] || '',
                     onChange: (_, { newValue }) => handleSegmentInputChange(segmentIndex, newValue),
-                    onKeyDown: (e) => {
-                      if (e.key === 'Enter' && suggestions.includes(segmentInputs[segmentIndex])) {
-                        handleSegmentInputKeyDown(segmentIndex, segmentInputs[segmentIndex]);
-                      }
-                    },
+                    onKeyDown: (e:any) => handleSegmentInputKeyDown(e, segmentIndex),
                   }}
                   theme={{
                     suggestionsContainerOpen: {
@@ -202,24 +226,6 @@ const FormulaCard: React.FC<FormulaCardProps> = ({ formula, index }) => {
             </Box>
           ))}
         </Box>
-        {/* <Box sx={{ display: 'flex', gap: 1, mb: 2, }}>
-          <TextField
-            name="startDate"
-            value={newSegment.startDate}
-            onChange={handleNewSegmentChange}
-            placeholder="Start Date"
-            variant="outlined"
-            size="small"
-          />
-          <TextField
-            name="endDate"
-            value={newSegment.endDate}
-            onChange={handleNewSegmentChange}
-            placeholder="End Date"
-            variant="outlined"
-            size="small"
-          />
-        </Box> */}
         <Button variant="text" onClick={handleAddSegment}>+ Add Time Segment</Button>
       </Collapse>
     </Paper>
